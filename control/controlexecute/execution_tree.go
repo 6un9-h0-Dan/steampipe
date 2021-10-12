@@ -13,6 +13,7 @@ import (
 	"github.com/turbot/steampipe/query/queryresult"
 	"github.com/turbot/steampipe/steampipeconfig/modconfig"
 	"github.com/turbot/steampipe/workspace"
+	"golang.org/x/sync/semaphore"
 )
 
 // ExecutionTree is a structure representing the control result hierarchy
@@ -79,8 +80,12 @@ func (e *ExecutionTree) Execute(ctx context.Context, client db_common.Client) in
 	defer log.Println("[TRACE]", "end ExecutionTree.Execute")
 	e.progress.Start()
 	defer e.progress.Finish()
+
+	// to limit the number of parallel controls go routines started
+	countingSemaphore := semaphore.NewWeighted(10)
+
 	// just execute the root - it will traverse the tree
-	errors := e.Root.Execute(ctx, client)
+	errors := e.Root.Execute(ctx, client, countingSemaphore)
 	// now build map of dimension property name to property value to color map
 	e.DimensionColorGenerator, _ = NewDimensionColorGenerator(4, 27)
 	e.DimensionColorGenerator.populate(e)
